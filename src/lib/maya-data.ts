@@ -105,6 +105,7 @@ export const dictionary: DictEntry[] = [
   { maya: "Káax", es: "gallina", tipo: "sust.", categoria: "Animales" },
   { maya: "T'u'ul", es: "conejo", tipo: "sust.", categoria: "Animales" },
   { maya: "Kay", es: "pez", tipo: "sust.", categoria: "Animales" },
+  { maya: "Ulun", es: "pavo / guajolote", tipo: "sust.", categoria: "Animales" },
 
   // Tiempo
   { maya: "Bejla'e'", es: "hoy", tipo: "adv.", categoria: "Tiempo" },
@@ -286,6 +287,8 @@ export const dailyWords: DailyWord[] = [
     significado: "Tú eres mi otro yo. Filosofía maya de unidad: el otro soy yo mismo en distinta forma.",
     curiosidad: "Se responde 'A lak'en' — yo soy tu otro tú. Cierra el círculo del reconocimiento mutuo.",
   },
+
+  
 ];
 
 // Devuelve la palabra del día según el día del año (rotación diaria estable)
@@ -383,7 +386,7 @@ dictionary.push(
 
   // Animales
   { maya: "Ch'óom", es: "zopilote", tipo: "sust.", categoria: "Animales" },
-  { maya: "Kuts", es: "pavo / guajolote", tipo: "sust.", categoria: "Animales" },
+  { maya: "Ulun", es: "pavo / guajolote", tipo: "sust.", categoria: "Animales" },
   { maya: "Áak", es: "tortuga", tipo: "sust.", categoria: "Animales" },
   { maya: "Aayin", es: "lagarto / cocodrilo", tipo: "sust.", categoria: "Animales" },
   { maya: "K'a'naab", es: "iguana", tipo: "sust.", categoria: "Animales" },

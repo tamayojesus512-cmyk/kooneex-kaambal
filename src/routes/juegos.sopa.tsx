@@ -1,167 +1,638 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { dictionary, categorias, type Category } from "../lib/maya-data";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import {
+  dictionary,
+  categorias,
+  type Category,
+} from "../lib/maya-data";
 import { ArrowLeft, RotateCcw, Trophy } from "lucide-react";
 
 export const Route = createFileRoute("/juegos/sopa")({
-  head: () => ({ meta: [{ title: "Sopa de letras · Juegos · ¡Ko'one'ex Kaambal!" }] }),
+  head: () => ({
+    meta: [
+      {
+        title:
+          "Sopa de letras · Juegos · ¡Ko'one'ex Kaambal!",
+      },
+    ],
+  }),
   component: SopaPage,
 });
 
 const SIZE = 12;
-const DIRS = [
-  [1, 0], [0, 1], [1, 1], [-1, 1],
-] as const;
 
-function clean(s: string) {
-  return s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['' ]/g, "");
+type Cell = [number, number];
+
+const DIRS: Cell[] = [
+  [1, 0], // vertical hacia abajo
+  [-1, 0], // vertical hacia arriba
+  [0, 1], // horizontal derecha
+  [0, -1], // horizontal izquierda
+  [1, 1], // diagonal abajo-derecha
+  [-1, -1], // diagonal arriba-izquierda
+  [-1, 1], // diagonal arriba-derecha
+  [1, -1], // diagonal abajo-izquierda
+];
+
+function clean(text: string): string {
+  return text
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’'´`\s-]/g, "");
 }
 
-type Placed = { word: string; display: string; cells: [number, number][] };
+type Placed = {
+  word: string;
+  display: string;
+  cells: Cell[];
+};
 
 function place(words: string[]) {
-  const grid: string[][] = Array.from({ length: SIZE }, () => Array(SIZE).fill(""));
-  const placed: Placed[] = [];
-  const cleaned = words.map(w => ({ display: w, clean: clean(w) }))
-    .filter(w => w.clean.length >= 3 && w.clean.length <= SIZE)
-    .sort((a, b) => b.clean.length - a.clean.length);
+  const grid: string[][] = Array.from(
+    { length: SIZE },
+    () => Array(SIZE).fill(""),
+  );
 
-  for (const { display, clean: w } of cleaned) {
-    let placedOk = false;
-    for (let tries = 0; tries < 80 && !placedOk; tries++) {
-      const [dr, dc] = DIRS[Math.floor(Math.random() * DIRS.length)];
-      const r0 = Math.floor(Math.random() * SIZE);
-      const c0 = Math.floor(Math.random() * SIZE);
-      const cells: [number, number][] = [];
-      let ok = true;
-      for (let i = 0; i < w.length; i++) {
-        const r = r0 + dr * i, c = c0 + dc * i;
-        if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) { ok = false; break; }
-        if (grid[r][c] && grid[r][c] !== w[i]) { ok = false; break; }
-        cells.push([r, c]);
+  const placed: Placed[] = [];
+
+  const cleaned = words
+    .map((word) => ({
+      display: word,
+      clean: clean(word),
+    }))
+    .filter(
+      (word) =>
+        word.clean.length >= 3 &&
+        word.clean.length <= SIZE,
+    )
+    .sort(
+      (first, second) =>
+        second.clean.length - first.clean.length,
+    );
+
+  for (const { display, clean: word } of cleaned) {
+    let placedSuccessfully = false;
+
+    for (
+      let attempt = 0;
+      attempt < 100 && !placedSuccessfully;
+      attempt += 1
+    ) {
+      const [rowDirection, columnDirection] =
+        DIRS[Math.floor(Math.random() * DIRS.length)];
+
+      const startingRow = Math.floor(Math.random() * SIZE);
+      const startingColumn = Math.floor(
+        Math.random() * SIZE,
+      );
+
+      const cells: Cell[] = [];
+      let validPosition = true;
+
+      for (let index = 0; index < word.length; index += 1) {
+        const row =
+          startingRow + rowDirection * index;
+
+        const column =
+          startingColumn + columnDirection * index;
+
+        if (
+          row < 0 ||
+          row >= SIZE ||
+          column < 0 ||
+          column >= SIZE
+        ) {
+          validPosition = false;
+          break;
+        }
+
+        if (
+          grid[row][column] &&
+          grid[row][column] !== word[index]
+        ) {
+          validPosition = false;
+          break;
+        }
+
+        cells.push([row, column]);
       }
-      if (!ok) continue;
-      cells.forEach(([r, c], i) => grid[r][c] = w[i]);
-      placed.push({ word: w, display, cells });
-      placedOk = true;
+
+      if (!validPosition) {
+        continue;
+      }
+
+      cells.forEach(([row, column], index) => {
+        grid[row][column] = word[index];
+      });
+
+      placed.push({
+        word,
+        display,
+        cells,
+      });
+
+      placedSuccessfully = true;
     }
   }
-  // fill empties
-  const letters = "ABCDEFIJKLMNOPSTUWXY";
-  for (let r = 0; r < SIZE; r++)
-    for (let c = 0; c < SIZE; c++)
-      if (!grid[r][c]) grid[r][c] = letters[Math.floor(Math.random() * letters.length)];
-  return { grid, placed };
+
+  const availableLetters = "ABCDEFIJKLMNOPSTUWXY";
+
+  for (let row = 0; row < SIZE; row += 1) {
+    for (let column = 0; column < SIZE; column += 1) {
+      if (!grid[row][column]) {
+        grid[row][column] =
+          availableLetters[
+            Math.floor(
+              Math.random() * availableLetters.length,
+            )
+          ];
+      }
+    }
+  }
+
+  return {
+    grid,
+    placed,
+  };
+}
+
+/*
+ * Crea una línea desde la primera casilla hasta la última.
+ *
+ * Solo acepta:
+ * - horizontal
+ * - vertical
+ * - diagonal
+ */
+function createStraightPath(
+  start: Cell,
+  end: Cell,
+): Cell[] | null {
+  const rowDifference = end[0] - start[0];
+  const columnDifference = end[1] - start[1];
+
+  const absoluteRowDifference = Math.abs(rowDifference);
+  const absoluteColumnDifference = Math.abs(
+    columnDifference,
+  );
+
+  const isHorizontal = rowDifference === 0;
+  const isVertical = columnDifference === 0;
+
+  const isDiagonal =
+    absoluteRowDifference === absoluteColumnDifference;
+
+  if (!isHorizontal && !isVertical && !isDiagonal) {
+    return null;
+  }
+
+  const numberOfSteps = Math.max(
+    absoluteRowDifference,
+    absoluteColumnDifference,
+  );
+
+  const rowStep =
+    rowDifference === 0
+      ? 0
+      : rowDifference > 0
+        ? 1
+        : -1;
+
+  const columnStep =
+    columnDifference === 0
+      ? 0
+      : columnDifference > 0
+        ? 1
+        : -1;
+
+  return Array.from(
+    { length: numberOfSteps + 1 },
+    (_, index): Cell => [
+      start[0] + rowStep * index,
+      start[1] + columnStep * index,
+    ],
+  );
+}
+
+function pathsAreEqual(
+  firstPath: Cell[],
+  secondPath: Cell[],
+): boolean {
+  return (
+    firstPath.length === secondPath.length &&
+    firstPath.every(
+      ([row, column], index) =>
+        row === secondPath[index][0] &&
+        column === secondPath[index][1],
+    )
+  );
 }
 
 function SopaPage() {
-  const [cat, setCat] = useState<Category>("Animales");
+  const [category, setCategory] =
+    useState<Category>("Animales");
+
   const [seed, setSeed] = useState(0);
+
   const { grid, placed } = useMemo(() => {
-    const words = dictionary.filter(d => d.categoria === cat).map(d => d.maya).slice(0, 10);
+    const words = dictionary
+      .filter(
+        (dictionaryWord) =>
+          dictionaryWord.categoria === category,
+      )
+      .map((dictionaryWord) => dictionaryWord.maya)
+      .slice(0, 10);
+
     void seed;
+
     return place(words);
-  }, [cat, seed]);
+  }, [category, seed]);
 
-  const [selecting, setSelecting] = useState(false);
-  const [path, setPath] = useState<[number, number][]>([]);
+  const [path, setPath] = useState<Cell[]>([]);
   const [found, setFound] = useState<string[]>([]);
-  const allFound = found.length === placed.length && placed.length > 0;
 
-  useEffect(() => { setFound([]); setPath([]); }, [cat, seed]);
+  /*
+   * Estas referencias permiten mantener la selección
+   * actualizada mientras se arrastra el mouse o el dedo.
+   */
+  const selectingRef = useRef(false);
+  const startCellRef = useRef<Cell | null>(null);
+  const pathRef = useRef<Cell[]>([]);
+
+  const allFound =
+    found.length === placed.length && placed.length > 0;
 
   useEffect(() => {
-    if (allFound) {
-      const prev = Number(localStorage.getItem("kaambal.scores.sopa") || 0);
-      if (placed.length > prev) localStorage.setItem("kaambal.scores.sopa", String(placed.length));
+    setFound([]);
+    setPath([]);
+
+    selectingRef.current = false;
+    startCellRef.current = null;
+    pathRef.current = [];
+  }, [category, seed]);
+
+  useEffect(() => {
+    if (!allFound) {
+      return;
+    }
+
+    const previousScore = Number(
+      localStorage.getItem("kaambal.scores.sopa") || 0,
+    );
+
+    if (placed.length > previousScore) {
+      localStorage.setItem(
+        "kaambal.scores.sopa",
+        String(placed.length),
+      );
     }
   }, [allFound, placed.length]);
 
-  function cellKey(r: number, c: number) { return `${r},${c}`; }
-  function inPath(r: number, c: number) { return path.some(([pr, pc]) => pr === r && pc === c); }
-  function inFound(r: number, c: number) {
-    return placed.some(p => found.includes(p.word) && p.cells.some(([pr, pc]) => pr === r && pc === c));
+  function cellKey(row: number, column: number) {
+    return `${row},${column}`;
   }
-  function start(r: number, c: number) { setSelecting(true); setPath([[r, c]]); }
-  function over(r: number, c: number) {
-    if (!selecting) return;
-    if (inPath(r, c)) return;
-    setPath(p => [...p, [r, c]]);
+
+  function isInCurrentPath(
+    row: number,
+    column: number,
+  ) {
+    return path.some(
+      ([pathRow, pathColumn]) =>
+        pathRow === row && pathColumn === column,
+    );
   }
-  function end() {
-    if (!selecting) { return; }
-    setSelecting(false);
-    const word = path.map(([r, c]) => grid[r][c]).join("");
-    const reversed = word.split("").reverse().join("");
-    const hit = placed.find(p => (p.word === word || p.word === reversed) && !found.includes(p.word));
-    if (hit) setFound(f => [...f, hit.word]);
-    setPath([]);
+
+  function isInFoundWord(
+    row: number,
+    column: number,
+  ) {
+    return placed.some(
+      (placedWord) =>
+        found.includes(placedWord.word) &&
+        placedWord.cells.some(
+          ([wordRow, wordColumn]) =>
+            wordRow === row &&
+            wordColumn === column,
+        ),
+    );
   }
-  function restart() { setSeed(s => s + 1); }
+
+  function updatePath(nextPath: Cell[]) {
+    pathRef.current = nextPath;
+    setPath(nextPath);
+  }
+
+  function startSelection(
+    row: number,
+    column: number,
+  ) {
+    const startingCell: Cell = [row, column];
+
+    selectingRef.current = true;
+    startCellRef.current = startingCell;
+
+    updatePath([startingCell]);
+  }
+
+  function moveSelection(
+    row: number,
+    column: number,
+  ) {
+    if (
+      !selectingRef.current ||
+      !startCellRef.current
+    ) {
+      return;
+    }
+
+    const straightPath = createStraightPath(
+      startCellRef.current,
+      [row, column],
+    );
+
+    /*
+     * Si intenta hacer una curva, no agrega esas casillas.
+     * Conserva la última línea válida.
+     */
+    if (!straightPath) {
+      return;
+    }
+
+    updatePath(straightPath);
+  }
+
+  function endSelection() {
+    if (!selectingRef.current) {
+      return;
+    }
+
+    selectingRef.current = false;
+    startCellRef.current = null;
+
+    const selectedPath = pathRef.current;
+
+    const matchingWord = placed.find((placedWord) => {
+      if (found.includes(placedWord.word)) {
+        return false;
+      }
+
+      const normalPath = placedWord.cells;
+      const reversedPath = [...placedWord.cells].reverse();
+
+      return (
+        pathsAreEqual(selectedPath, normalPath) ||
+        pathsAreEqual(selectedPath, reversedPath)
+      );
+    });
+
+    if (matchingWord) {
+      setFound((currentFound) => {
+        if (
+          currentFound.includes(matchingWord.word)
+        ) {
+          return currentFound;
+        }
+
+        return [
+          ...currentFound,
+          matchingWord.word,
+        ];
+      });
+    }
+
+    updatePath([]);
+  }
+
+  /*
+   * Permite detectar la casilla que está debajo del
+   * mouse o del dedo mientras se arrastra.
+   */
+  function handlePointerMove(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) {
+    if (!selectingRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const element = document.elementFromPoint(
+      event.clientX,
+      event.clientY,
+    );
+
+    const cell =
+      element?.closest<HTMLButtonElement>(
+        "[data-sopa-cell='true']",
+      );
+
+    if (!cell) {
+      return;
+    }
+
+    const row = Number(cell.dataset.row);
+    const column = Number(cell.dataset.column);
+
+    if (
+      Number.isNaN(row) ||
+      Number.isNaN(column)
+    ) {
+      return;
+    }
+
+    moveSelection(row, column);
+  }
+
+  function restart() {
+    setSeed((currentSeed) => currentSeed + 1);
+  }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
-      <Link to="/juegos" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground mb-6"><ArrowLeft className="h-3 w-3" /> volver a juegos</Link>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
+      <Link
+        to="/juegos"
+        className="mb-6 inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        Volver a juegos
+      </Link>
+
       <header className="mb-6 text-center">
-        <p className="text-xs uppercase tracking-[0.3em] text-cinnabar mb-3">— Sopa de letras</p>
-        <h1 className="font-display text-3xl sm:text-5xl">Encuentra las palabras <em className="text-gradient-gold">mayas</em>.</h1>
+        <p className="mb-3 text-xs uppercase tracking-[0.3em] text-cinnabar">
+          — Sopa de letras
+        </p>
+
+        <h1 className="font-display text-3xl sm:text-5xl">
+          Encuentra las palabras{" "}
+          <em className="text-gradient-gold">
+            mayas
+          </em>
+          .
+        </h1>
       </header>
 
-      <div className="flex flex-wrap gap-1.5 mb-4 justify-center">
-        {categorias.map(c => (
-          <button key={c} onClick={() => setCat(c)}
-            className={`px-3 py-1.5 rounded-full text-xs border transition ${cat === c ? "bg-cinnabar text-primary-foreground border-cinnabar" : "border-border text-muted-foreground hover:border-cinnabar/50"}`}
-          >{c}</button>
+      <div className="mb-4 flex flex-wrap justify-center gap-1.5">
+        {categorias.map((currentCategory) => (
+          <button
+            key={currentCategory}
+            type="button"
+            onClick={() =>
+              setCategory(currentCategory)
+            }
+            className={`
+              rounded-full border px-3 py-1.5
+              text-xs transition
+              ${
+                category === currentCategory
+                  ? "border-cinnabar bg-cinnabar text-primary-foreground"
+                  : "border-border text-muted-foreground hover:border-cinnabar/50"
+              }
+            `}
+          >
+            {currentCategory}
+          </button>
         ))}
       </div>
 
-      <div className="flex items-center justify-between text-xs uppercase tracking-wider text-muted-foreground mb-3">
-        <span>Encontradas: <span className="text-gold font-semibold">{found.length}</span> / {placed.length}</span>
-        <button onClick={restart} className="inline-flex items-center gap-2 text-cinnabar hover:text-gold"><RotateCcw className="h-3 w-3" /> nueva sopa</button>
+      <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wider text-muted-foreground">
+        <span>
+          Encontradas:{" "}
+          <span className="font-semibold text-gold">
+            {found.length}
+          </span>{" "}
+          / {placed.length}
+        </span>
+
+        <button
+          type="button"
+          onClick={restart}
+          className="inline-flex items-center gap-2 text-cinnabar hover:text-gold"
+        >
+          <RotateCcw className="h-3 w-3" />
+          Nueva sopa
+        </button>
       </div>
 
       <div
-        onMouseLeave={end}
-        onMouseUp={end}
-        onTouchEnd={end}
-        className="grid gap-0.5 sm:gap-1 select-none mb-6 mx-auto"
-        style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0,1fr))` }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endSelection}
+        onPointerCancel={endSelection}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") {
+            endSelection();
+          }
+        }}
+        className="mx-auto mb-6 grid touch-none select-none gap-0.5 sm:gap-1"
+        style={{
+          gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))`,
+        }}
       >
-        {grid.map((row, r) => row.map((ch, c) => {
-          const sel = inPath(r, c); const fnd = inFound(r, c);
-          return (
-            <button
-              key={cellKey(r, c)}
-              onMouseDown={() => start(r, c)}
-              onMouseEnter={() => over(r, c)}
-              onTouchStart={() => start(r, c)}
-              className={`aspect-square text-[11px] sm:text-sm font-mono font-bold rounded-sm transition ${
-                fnd ? "bg-jade/30 text-jade border border-jade/60" :
-                sel ? "bg-cinnabar text-primary-foreground" :
-                "bg-obsidian/70 border border-border text-foreground/80 hover:bg-cinnabar/15"
-              }`}
-            >{ch}</button>
-          );
-        }))}
+        {grid.map((row, rowIndex) =>
+          row.map((character, columnIndex) => {
+            const selected = isInCurrentPath(
+              rowIndex,
+              columnIndex,
+            );
+
+            const discovered = isInFoundWord(
+              rowIndex,
+              columnIndex,
+            );
+
+            return (
+              <button
+                key={cellKey(
+                  rowIndex,
+                  columnIndex,
+                )}
+                type="button"
+                data-sopa-cell="true"
+                data-row={rowIndex}
+                data-column={columnIndex}
+                onPointerDown={(event) => {
+                  if (
+                    event.pointerType === "mouse" &&
+                    event.button !== 0
+                  ) {
+                    return;
+                  }
+
+                  event.preventDefault();
+
+                  startSelection(
+                    rowIndex,
+                    columnIndex,
+                  );
+                }}
+                className={`
+                  aspect-square rounded-sm border
+                  font-mono text-[11px] font-bold
+                  transition sm:text-sm
+
+                  ${
+                    discovered
+                      ? "border-jade/60 bg-jade/30 text-jade"
+                      : selected
+                        ? "border-cinnabar bg-cinnabar text-primary-foreground"
+                        : "border-border bg-obsidian/70 text-foreground/80 hover:bg-cinnabar/15"
+                  }
+                `}
+              >
+                {character}
+              </button>
+            );
+          }),
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-card/50 p-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Palabras ocultas</div>
+        <div className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+          Palabras ocultas
+        </div>
+
         <div className="flex flex-wrap gap-1.5">
-          {placed.map(p => (
-            <span key={p.word} className={`px-2.5 py-1 rounded-full text-xs border transition ${
-              found.includes(p.word) ? "bg-jade/15 border-jade/50 text-jade line-through" : "border-border text-foreground"
-            }`}>{p.display}</span>
+          {placed.map((placedWord) => (
+            <span
+              key={placedWord.word}
+              className={`
+                rounded-full border px-2.5 py-1
+                text-xs transition
+
+                ${
+                  found.includes(placedWord.word)
+                    ? "border-jade/50 bg-jade/15 text-jade line-through"
+                    : "border-border text-foreground"
+                }
+              `}
+            >
+              {placedWord.display}
+            </span>
           ))}
         </div>
       </div>
 
       {allFound && (
-        <div className="mt-6 card-ritual rounded-2xl p-6 text-center">
-          <Trophy className="h-10 w-10 text-gold mx-auto mb-3" />
-          <p className="font-display text-2xl">¡Encontraste todas!</p>
-          <button onClick={restart} className="mt-4 inline-flex items-center gap-2 rounded-full bg-cinnabar text-primary-foreground px-5 py-2.5 text-sm font-medium">
-            <RotateCcw className="h-4 w-4" /> Nueva sopa
+        <div className="card-ritual mt-6 rounded-2xl p-6 text-center">
+          <Trophy className="mx-auto mb-3 h-10 w-10 text-gold" />
+
+          <p className="font-display text-2xl">
+            ¡Encontraste todas!
+          </p>
+
+          <button
+            type="button"
+            onClick={restart}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-cinnabar px-5 py-2.5 text-sm font-medium text-primary-foreground"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Nueva sopa
           </button>
         </div>
       )}

@@ -5,7 +5,7 @@ import { dictionary, type DictEntry } from "../lib/maya-data";
 import { SpeakerButton } from "../components/SpeakerButton";
 import { ArrowLeft, Check, X, RotateCcw, Trophy } from "lucide-react";
 
-export const Route = createFileRoute("/juegos/flasgcards")({
+export const Route = createFileRoute("/juegos/flashcards")({
   head: () => ({ meta: [{ title: "Flashcards · Juegos · ¡Ko'one'ex Kaambal!" }] }),
   component: FlashcardsPage,
 });
